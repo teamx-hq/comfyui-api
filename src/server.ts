@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUI from "@fastify/swagger-ui";
+import fastifyCors from "@fastify/cors";
 import {
   jsonSchemaTransform,
   serializerCompiler,
@@ -39,6 +40,14 @@ const server = Fastify({
   bodyLimit: 45 * 1024 * 1024, // 45MB
   logger: true,
 });
+
+server.register(fastifyCors, {
+  origin: ["http://localhost:3001"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+});
+
 server.setValidatorCompiler(validatorCompiler);
 server.setSerializerCompiler(serializerCompiler);
 
