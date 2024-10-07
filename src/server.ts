@@ -42,7 +42,7 @@ const server = Fastify({
 });
 
 server.register(fastifyCors, {
-  origin: ["http://localhost:3001"],
+  origin: ["*"],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
