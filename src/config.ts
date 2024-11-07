@@ -3,6 +3,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "child_process";
 import { z } from "zod";
+
+interface ComfyDescription {
+  samplers: string[];
+  schedulers: string[];
+}
+
 const {
   CMD = "init.sh",
   HOST = "::",
@@ -81,7 +87,7 @@ with open("${temptComfyFilePath}", "w") as f:
     execSync(command, {
       cwd: comfyDir,
       encoding: "utf-8",
-      shell: "/bin/sh",  // Explicitly specify shell
+      shell: "/bin/bash",  // Changed from /bin/sh to /bin/bash
       env: {
         ...process.env,
         PYTHONPATH: '/opt/ComfyUI',
