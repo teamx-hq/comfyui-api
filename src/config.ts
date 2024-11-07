@@ -59,6 +59,8 @@ interface ComfyDescription {
 function getComfyUIDescription(): ComfyDescription {
   const temptComfyFilePath = path.join(comfyDir, "temp_comfy_description.json");
   const pythonCode = `
+import sys
+sys.path.append('/opt/ComfyUI')
 import comfy.samplers
 import json
 
@@ -72,33 +74,32 @@ with open("${temptComfyFilePath}", "w") as f:
 `;
 
   const tempFilePath = path.join(comfyDir, "temp_comfy_description.py");
-  const command = `
-  source /opt/ai-dock/etc/environment.sh \
-  && source /opt/ai-dock/bin/venv-set.sh comfyui \
-  && source "$COMFYUI_VENV/bin/activate" \
-  && python ${tempFilePath}`;
 
   try {
-    // Write the Python code to a temporary file
     fs.writeFileSync(tempFilePath, pythonCode);
-
-    // Execute the Python script synchronously
-    execSync(command, {
+    
+    // Simplified execution without shell sourcing
+    execSync(`python3 ${tempFilePath}`, {
       cwd: comfyDir,
       encoding: "utf-8",
-      shell: process.env.SHELL,
       env: {
         ...process.env,
+        PYTHONPATH: '/opt/ComfyUI',
+        PATH: `/usr/local/bin:${process.env.PATH}`,
       },
     });
+
     const output = fs.readFileSync(temptComfyFilePath, { encoding: "utf-8" });
     return JSON.parse(output.trim()) as ComfyDescription;
   } catch (error: any) {
     throw new Error(`Failed to get ComfyUI description: ${error.message}`);
   } finally {
-    // Clean up the temporary file
+    // Clean up both temporary files
     try {
       fs.unlinkSync(tempFilePath);
+      if (fs.existsSync(temptComfyFilePath)) {
+        fs.unlinkSync(temptComfyFilePath);
+      }
     } catch (unlinkError: any) {
       console.error(`Failed to delete temporary file: ${unlinkError.message}`);
     }
