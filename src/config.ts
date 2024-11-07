@@ -51,32 +51,61 @@ if (WARMUP_PROMPT_FILE) {
   }
 }
 
+function getComfyUIDescription(): ComfyDescription {
+  const temptComfyFilePath = path.join(comfyDir, "temp_comfy_description.json");
+  const pythonCode = `
+import comfy.samplers
+import json
+
+comfy_description = {
+    "samplers": comfy.samplers.KSampler.SAMPLERS,
+    "schedulers": comfy.samplers.KSampler.SCHEDULERS,
+}
+
+with open("${temptComfyFilePath}", "w") as f:
+    json.dump(comfy_description, f)
+`;
+
+  const tempFilePath = path.join(comfyDir, "temp_comfy_description.py");
+  const command = `
+  . /opt/ai-dock/etc/environment.sh \
+  && . /opt/ai-dock/bin/venv-set.sh comfyui \
+  && . "$COMFYUI_VENV/bin/activate" \
+  && python ${tempFilePath}`;
+
+  try {
+    // Write the Python code to a temporary file
+    fs.writeFileSync(tempFilePath, pythonCode);
+
+    // Execute the Python script synchronously
+    execSync(command, {
+      cwd: comfyDir,
+      encoding: "utf-8",
+      shell: "/bin/sh",  // Explicitly specify shell
+      env: {
+        ...process.env,
+        PYTHONPATH: '/opt/ComfyUI',
+      },
+    });
+    const output = fs.readFileSync(temptComfyFilePath, { encoding: "utf-8" });
+    return JSON.parse(output.trim()) as ComfyDescription;
+  } catch (error: any) {
+    throw new Error(`Failed to get ComfyUI description: ${error.message}`);
+  } finally {
+    // Clean up temporary files
+    try {
+      fs.unlinkSync(tempFilePath);
+      if (fs.existsSync(temptComfyFilePath)) {
+        fs.unlinkSync(temptComfyFilePath);
+      }
+    } catch (unlinkError: any) {
+      console.error(`Failed to delete temporary file: ${unlinkError.message}`);
+    }
+  }
+}
+
 // Remove getComfyUIDescription function and replace with static values
-const comfyDescription = {
-  samplers: [
-    "euler", 
-    "euler_ancestral", 
-    "heun", 
-    "dpm_2", 
-    "dpm_2_ancestral",
-    "lms",
-    "dpm_fast",
-    "dpm_adaptive",
-    "dpmpp_2s_ancestral",
-    "dpmpp_sde",
-    "dpmpp_2m",
-    "ddim",
-    "uni_pc",
-    "uni_pc_bh2"
-  ],
-  schedulers: [
-    "normal",
-    "karras",
-    "exponential",
-    "simple",
-    "ddim_uniform"
-  ]
-} as const;
+const comfyDescription = getComfyUIDescription();
 
 const config = {
   comfyLaunchCmd: CMD,
