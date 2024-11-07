@@ -51,62 +51,32 @@ if (WARMUP_PROMPT_FILE) {
   }
 }
 
-interface ComfyDescription {
-  samplers: string[];
-  schedulers: string[];
-}
-
-function getComfyUIDescription(): ComfyDescription {
-  const temptComfyFilePath = path.join(comfyDir, "temp_comfy_description.json");
-  const pythonCode = `
-import sys
-sys.path.append('/opt/ComfyUI')
-import comfy.samplers
-import json
-
-comfy_description = {
-    "samplers": comfy.samplers.KSampler.SAMPLERS,
-    "schedulers": comfy.samplers.KSampler.SCHEDULERS,
-}
-
-with open("${temptComfyFilePath}", "w") as f:
-    json.dump(comfy_description, f)
-`;
-
-  const tempFilePath = path.join(comfyDir, "temp_comfy_description.py");
-
-  try {
-    fs.writeFileSync(tempFilePath, pythonCode);
-    
-    // Simplified execution without shell sourcing
-    execSync(`python3 ${tempFilePath}`, {
-      cwd: comfyDir,
-      encoding: "utf-8",
-      env: {
-        ...process.env,
-        PYTHONPATH: '/opt/ComfyUI',
-        PATH: `/usr/local/bin:${process.env.PATH}`,
-      },
-    });
-
-    const output = fs.readFileSync(temptComfyFilePath, { encoding: "utf-8" });
-    return JSON.parse(output.trim()) as ComfyDescription;
-  } catch (error: any) {
-    throw new Error(`Failed to get ComfyUI description: ${error.message}`);
-  } finally {
-    // Clean up both temporary files
-    try {
-      fs.unlinkSync(tempFilePath);
-      if (fs.existsSync(temptComfyFilePath)) {
-        fs.unlinkSync(temptComfyFilePath);
-      }
-    } catch (unlinkError: any) {
-      console.error(`Failed to delete temporary file: ${unlinkError.message}`);
-    }
-  }
-}
-
-const comfyDescription = getComfyUIDescription();
+// Remove getComfyUIDescription function and replace with static values
+const comfyDescription = {
+  samplers: [
+    "euler", 
+    "euler_ancestral", 
+    "heun", 
+    "dpm_2", 
+    "dpm_2_ancestral",
+    "lms",
+    "dpm_fast",
+    "dpm_adaptive",
+    "dpmpp_2s_ancestral",
+    "dpmpp_sde",
+    "dpmpp_2m",
+    "ddim",
+    "uni_pc",
+    "uni_pc_bh2"
+  ],
+  schedulers: [
+    "normal",
+    "karras",
+    "exponential",
+    "simple",
+    "ddim_uniform"
+  ]
+} as const;
 
 const config = {
   comfyLaunchCmd: CMD,
