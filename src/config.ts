@@ -17,13 +17,15 @@ const {
   COMFYUI_PORT_HOST = "8188",
   STARTUP_CHECK_INTERVAL_S = "1",
   STARTUP_CHECK_MAX_TRIES = "10",
-  OUTPUT_DIR = "/opt/ComfyUI/output",
-  INPUT_DIR = "/opt/ComfyUI/input",
-  MODEL_DIR = "/opt/ComfyUI/models",
+  COMFY_HOME = "/opt/ComfyUI",
+  OUTPUT_DIR,
+  INPUT_DIR,
+  MODEL_DIR,
   WARMUP_PROMPT_FILE,
   WORKFLOW_MODELS = "all",
   WORKFLOW_DIR = "/workflows",
   MARKDOWN_SCHEMA_DESCRIPTIONS = "true",
+  BASE = "ai-dock",
 } = process.env;
 
 fs.mkdirSync(WORKFLOW_DIR, { recursive: true });
@@ -34,8 +36,16 @@ const port = parseInt(PORT, 10);
 const startupCheckInterval = parseInt(STARTUP_CHECK_INTERVAL_S, 10) * 1000;
 const startupCheckMaxTries = parseInt(STARTUP_CHECK_MAX_TRIES, 10);
 
+// type for {string: string}
+
+const loadEnvCommand: Record<string, string> = {
+  "ai-dock": `source /opt/ai-dock/etc/environment.sh \
+  && source /opt/ai-dock/bin/venv-set.sh comfyui \
+  && source "$COMFYUI_VENV/bin/activate"`,
+};
+
 // The parent directory of model_dir
-const comfyDir = path.join(MODEL_DIR, "..");
+const comfyDir = COMFY_HOME;
 
 let warmupPrompt: any | undefined;
 let warmupCkpt: string | undefined;
@@ -73,11 +83,11 @@ with open("${temptComfyFilePath}", "w") as f:
 `;
 
   const tempFilePath = path.join(comfyDir, "temp_comfy_description.py");
-  const command = `
-  . /opt/ai-dock/etc/environment.sh \
-  && . /opt/ai-dock/bin/venv-set.sh comfyui \
-  && . "$COMFYUI_VENV/bin/activate" \
-  && python ${tempFilePath}`;
+  let command = `python ${tempFilePath}`;
+  if (BASE in loadEnvCommand) {
+    command = `${loadEnvCommand[BASE]} \
+    && python ${tempFilePath}`;
+  }
 
   try {
     // Write the Python code to a temporary file
@@ -123,8 +133,9 @@ const config = {
   comfyURL,
   startupCheckInterval,
   startupCheckMaxTries,
-  outputDir: OUTPUT_DIR,
-  inputDir: INPUT_DIR,
+  comfyDir,
+  outputDir: OUTPUT_DIR ?? path.join(comfyDir, "output"),
+  inputDir: INPUT_DIR ?? path.join(comfyDir, "input"),
   workflowDir: WORKFLOW_DIR,
   warmupPrompt,
   warmupCkpt,
@@ -142,14 +153,15 @@ const config = {
   markdownSchemaDescriptions: MARKDOWN_SCHEMA_DESCRIPTIONS === "true",
 };
 
-const model_dirs = fs.readdirSync(MODEL_DIR);
-for (const model_dir of model_dirs) {
-  const model_path = path.join(MODEL_DIR, model_dir);
+const modelDir = MODEL_DIR ?? path.join(comfyDir, "models");
+const modelSubDirs = fs.readdirSync(modelDir);
+for (const modelType of modelSubDirs) {
+  const model_path = path.join(modelDir, modelType);
   if (fs.statSync(model_path).isDirectory()) {
     const all = fs
       .readdirSync(model_path)
       .filter((f) => !(f.startsWith("put_") && f.endsWith("_here")));
-    config.models[model_dir] = {
+    config.models[modelType] = {
       dir: model_path,
       all,
       enum: z.enum(all as [string, ...string[]]),

@@ -7,6 +7,8 @@ import { Readable } from "stream";
 import path from "path";
 import { randomUUID } from "crypto";
 import { ZodObject, ZodRawShape, ZodTypeAny, ZodDefault } from "zod";
+import sharp from "sharp";
+import { OutputConversionOptions } from "./types";
 
 const commandExecutor = new CommandExecutor();
 
@@ -15,7 +17,10 @@ export async function sleep(ms: number): Promise<void> {
 }
 
 export function launchComfyUI() {
-  commandExecutor.execute(config.comfyLaunchCmd, [], {
+  const cmdAndArgs = config.comfyLaunchCmd.split(" ");
+  const cmd = cmdAndArgs[0];
+  const args = cmdAndArgs.slice(1);
+  commandExecutor.execute(cmd, args, {
     DIRECT_ADDRESS: config.comfyHost,
     COMFYUI_PORT_HOST: config.comfyPort,
     WEB_ENABLE_AUTH: "false",
@@ -214,4 +219,20 @@ function getZodDefault(zodType: ZodTypeAny): string {
     return JSON.stringify(defaultValue);
   }
   return "-";
+}
+
+export async function convertImageBuffer(
+  imageBuffer: Buffer,
+  options: OutputConversionOptions
+) {
+  const { format, options: conversionOptions } = options;
+  let image = sharp(imageBuffer);
+
+  if (format === "webp") {
+    image = image.webp(conversionOptions);
+  } else {
+    image = image.jpeg(conversionOptions);
+  }
+
+  return image.toBuffer();
 }

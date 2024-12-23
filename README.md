@@ -1,12 +1,33 @@
 # ComfyUI API - A Stateless and Extendable API for ComfyUI
+
 A simple wrapper that facilitates using ComfyUI as a stateless API, either by receiving images in the response, or by sending completed images to a webhook
+
+- [ComfyUI API - A Stateless and Extendable API for ComfyUI](#comfyui-api---a-stateless-and-extendable-api-for-comfyui)
+  - [Download and Usage](#download-and-usage)
+  - [Features](#features)
+  - [Probes](#probes)
+  - [API Configuration Guide](#api-configuration-guide)
+    - [Environment Variables](#environment-variables)
+    - [Configuration Details](#configuration-details)
+    - [Additional Notes](#additional-notes)
+  - [Generating New Workflow Endpoints](#generating-new-workflow-endpoints)
+    - [Automating with Claude 3.5 Sonnet](#automating-with-claude-35-sonnet)
+  - [Prebuilt Docker Images](#prebuilt-docker-images)
+  - [Contributing](#contributing)
+
+## Download and Usage
 
 Download the latest version from the release page, and copy it into your existing ComfyUI dockerfile. Then, you can use it like this:
 
 ```dockerfile
-COPY comfyui-api .
+# Change this to the version you want to use
+ARG api_version=1.6.1
+
+# Download the comfyui-api binary, and make it executable
+ADD https://github.com/SaladTechnologies/comfyui-api/releases/download/${api_version}/comfyui-api .
 RUN chmod +x comfyui-api
 
+# Set CMD to launch the comfyui-api binary. The comfyui-api binary will launch ComfyUI as a child process.
 CMD ["./comfyui-api"]
 ```
 
@@ -21,14 +42,20 @@ The server hosts swagger docs at `/docs`, which can be used to interact with the
 - **Swagger Docs**: The server hosts swagger docs at `/docs`, which can be used to interact with the API.
 - **"Synchronous" Support**: The server will return base64-encoded images directly in the response, if no webhook is provided.
 - **Webhook Support**: The server can send completed images to a webhook, which can be used to store images, or to send them to a user.
-- **Warmup Workflow**: The server can be configured to run a warmup workflow on startup, which can be used to load models, and to ensure the server is ready to accept requests.
+- **Easily Submit Images**: The server can accept images as base64-encoded strings, or as URLs to images. This makes image-to-image workflows much easier to use.
+- **Warmup Workflow**: The server can be configured to run a warmup workflow on startup, which can be used to load and warm up models, and to ensure the server is ready to accept requests.
+- **Return Images In PNG (default), JPEG, or WebP**: The server can return images in PNG, JPEG, or WebP format, via a parameter in the API request. Most options supported by [sharp](https://sharp.pixelplumbing.com/) are supported.
 - **Probes**: The server has two probes, `/health` and `/ready`, which can be used to check the server's health and readiness to receive traffic.
-- **Dynamic Workflow Endpoints**: Automatically mount new workflow endpoints by adding conforming `.js` or `.ts` files to the `/workflows` directory in your docker image. See [below](#generating-new-workflow-endpoints) for more information.
-- **Works Great with Salad**: The server is designed to work well with Salad, and can be used to host ComfyUI on the Salad platform. It is likely to work well with other platforms as well.
+- **Dynamic Workflow Endpoints**: Automatically mount new workflow endpoints by adding conforming `.js` or `.ts` files to the `/workflows` directory in your docker image. See [below](#generating-new-workflow-endpoints) for more information. A [Claude 3.5 Sonnet](https://claude.ai) [prompt](./claude-endpoint-creation-prompt.md) is included to assist in automating this process.
+- **Bring Your Own Models And Extensions**: Use any model or extension you want by adding them to the normal ComfyUI directories `/opt/ComfyUI/`.
+- **Works Great with SaladCloud**: The server is designed to work well with SaladCloud, and can be used to host ComfyUI on the SaladCloud platform. It is likely to work well with other platforms as well.
+- **Single Binary**: The server is distributed as a single binary, and can be run with no dependencies.
+- **Friendly License**: The server is distributed under the MIT license, and can be used for any purpose. All of its dependencies are also MIT or Apache 2.0 licensed, except ComfyUI itself, which is GPL-3.0 licensed.
 
 ## Probes
 
-The server has two probes, `/health` and `/ready`. 
+The server has two probes, `/health` and `/ready`.
+
 - The `/health` probe will return a 200 status code once the warmup workflow has complete.
 - The `/ready` probe will also return a 200 status code once the warmup workflow has completed, and the server is ready to accept requests.
 
@@ -43,20 +70,22 @@ This guide provides an overview of how to configure the application using enviro
 The following table lists the available environment variables and their default values.
 The default values mostly assume this will run on top of an [ai-dock](https://github.com/ai-dock/comfyui) image, but can be customized as needed.
 
-| Variable | Default Value | Description |
-|----------|---------------|-------------|
-| CMD | "init.sh" | Command to launch ComfyUI |
-| HOST | "::" | Wrapper host address |
-| PORT | "3000" | Wrapper port number |
-| DIRECT_ADDRESS | "127.0.0.1" | Direct address for ComfyUI |
-| COMFYUI_PORT_HOST | "8188" | ComfyUI port number |
-| STARTUP_CHECK_INTERVAL_S | "1" | Interval in seconds between startup checks |
-| STARTUP_CHECK_MAX_TRIES | "10" | Maximum number of startup check attempts |
-| OUTPUT_DIR | "/opt/ComfyUI/output" | Directory for output files |
-| INPUT_DIR | "/opt/ComfyUI/input" | Directory for input files |
-| MODEL_DIR | "/opt/ComfyUI/models" | Directory for model files |
-| WARMUP_PROMPT_FILE | (not set) | Path to warmup prompt file (optional) |
-| WORKFLOW_DIR | "/workflows" | Directory for workflow files |
+| Variable                 | Default Value         | Description                                                                                                                                                                                            |
+| ------------------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CMD                      | "init.sh"             | Command to launch ComfyUI                                                                                                                                                                              |
+| HOST                     | "::"                  | Wrapper host address                                                                                                                                                                                   |
+| PORT                     | "3000"                | Wrapper port number                                                                                                                                                                                    |
+| DIRECT_ADDRESS           | "127.0.0.1"           | Direct address for ComfyUI                                                                                                                                                                             |
+| COMFYUI_PORT_HOST        | "8188"                | ComfyUI port number                                                                                                                                                                                    |
+| STARTUP_CHECK_INTERVAL_S | "1"                   | Interval in seconds between startup checks                                                                                                                                                             |
+| STARTUP_CHECK_MAX_TRIES  | "10"                  | Maximum number of startup check attempts                                                                                                                                                               |
+| COMFY_HOME               | "/opt/ComfyUI"        | ComfyUI home directory                                                                                                                                                                                 |
+| OUTPUT_DIR               | "/opt/ComfyUI/output" | Directory for output files                                                                                                                                                                             |
+| INPUT_DIR                | "/opt/ComfyUI/input"  | Directory for input files                                                                                                                                                                              |
+| MODEL_DIR                | "/opt/ComfyUI/models" | Directory for model files                                                                                                                                                                              |
+| WARMUP_PROMPT_FILE       | (not set)             | Path to warmup prompt file (optional)                                                                                                                                                                  |
+| WORKFLOW_DIR             | "/workflows"          | Directory for workflow files                                                                                                                                                                           |
+| BASE                     | "ai-dock"             | There are different ways to load the comfyui environment for determining config values that vary with the base image. Currently only "ai-dock" has preset values. Set to empty string to not use this. |
 
 ### Configuration Details
 
@@ -74,6 +103,7 @@ The default values mostly assume this will run on top of an [ai-dock](https://gi
    - It will attempt up to `STARTUP_CHECK_MAX_TRIES` before giving up.
 
 4. **Directories**:
+   - The application uses the `COMFY_HOME` environment variable to locate the ComfyUI installation.
    - Output files are stored in `OUTPUT_DIR`.
    - Input files are read from `INPUT_DIR`.
    - Model files are located in `MODEL_DIR`.
@@ -282,6 +312,8 @@ function generateWorkflow(input: InputType): Record<string, ComfyNode> {
 const workflow: Workflow = {
   RequestSchema,
   generateWorkflow,
+  summary: "Text to Image",
+  description: "Generate an image from a text prompt",
 };
 
 export default workflow;
@@ -301,9 +333,43 @@ For example, a directory structure like this:
 ```
 
 Would yield the following endpoints:
+
 - `POST /workflows/sdxl/img2img`
 - `POST /workflows/sdxl/txt2img-with-refiner`
 - `POST /workflows/sdxl/txt2img`
 
 These endpoints will be present in the swagger docs, and can be used to interact with the API.
 If you provide descriptions in your zod schemas, these will be used to create a table of inputs in the swagger docs.
+
+### Automating with Claude 3.5 Sonnet
+
+> **Note**: This requires having an account with Anthropic, and your anthropic API key in the environment variable `ANTHROPIC_API_KEY`.
+
+Creating these endpoints can be done mostly automatically by [Claude 3.5 Sonnet](https://console.anthropic.com/), given the JSON prompt graph.
+A system prompt to do this is included [here](./claude-endpoint-creation-prompt.md).
+
+A script that uses this prompt to create endpoints is included [here](./generate-workflow). It requires `jq` and `curl` to be installed.
+
+```shell
+./generate-workflow <inputFile> <outputFile>
+```
+
+Where `<inputFile>` is the JSON prompt graph, and `<outputFile>` is the output file to write the generated workflow to.
+
+As with all AI-generated code, it is strongly recommended to review the generated code before using it in production.
+
+## Prebuilt Docker Images
+
+There are several prebuilt Docker images using this server.
+They are built from the [SaladCloud Recipes Repo](https://github.com/SaladTechnologies/salad-recipes/), and can be found on [Docker Hub](https://hub.docker.com/r/saladtechnologies/comfyui/tags).
+
+The tag pattern is `saladtechnologies/comfyui:comfy<comfy-version>-api<api-version>-<model|base>` where:
+
+- `<comfy-version>` is the version of ComfyUI used
+- `<api-version>` is the version of the comfyui-api server
+- `<model|base>` is the model used. There is a `base` tag for an image that contains ComfyUI and the comfyui-api server, but no models. There are also tags for specific models, like `sdxl-with-refiner` or `flux-schnell-fp8`.
+
+## Contributing
+
+Contributions are welcome! Please open an issue or a pull request if you have any suggestions or improvements.
+ComfyUI is a powerful tool with MANY options, and it's likely that not all of them are currently supported by the comfyui-api server. If you find a feature that is missing, please open an issue or a pull request to add it. Let's make productionizing ComfyUI as easy as possible!
